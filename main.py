@@ -102,8 +102,12 @@ phi = sci.fsolve(NS, inguess_phi)
 print("Fluid volume fraction:", phi[0])
 
 print("Pressure gradient:", dpdz(phi))
+<<<<<<< HEAD
 
 #branchh
+=======
+#new
+>>>>>>> a4f8f7031af340d10c8724c6a59af737da06c5d6
 
 
 
