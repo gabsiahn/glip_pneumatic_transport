@@ -8,100 +8,102 @@
 #-----------------------Initialization-----------------------#
 # Python packages #
 import numpy as np
-import matplotlib.pyplot as plot
-import scipy.optimize as sci
+import pandas as pd
+import os
 
-#-----------------------Input parameters----------------------#
-import physical_props as phys
+# Module functions
+from reynolds import reynolds
+from computeBuoyancyFactor import computeBuoyancyFactor
+from termvel import termvel
+from colebrook import colebrook
+from computePhi import computePhi
 
-# Initial guesses #
-inguess_frict = 0.001 # initial guess of friction factor based on Colebrook formula
-inguess_phi = 0.3 # initial guess of phi
 
-# Flow parameters #
+# Postprocessing by Wajih!
+
+import input
+
+g = 9.81 # gravitational acceleration, in m/s2 
+
+#---------------------Flow parameters-----------------------#
 # Pipe
-A = np.pi/4*phys.D**2 # cross-section area of the pipe, in m2
-
-# Fluid
-Vf = np.linspace(3.5,13,num=100) # fluid velocity, in m/s
-# The range of this fluid velocity is based on Rautiainen's paper
+A = np.pi/4*input.D**2 # cross-section area of the pipe, in m2
 
 # Solid
-mf_part = [5.1, 10.5, 19.6, 49.1, 80.7] # solid mass flux, in kg/m2/s
-m_part = mf_part*A # solid mass flowrate, in kg/s, vector
-Vp = m_part/phys.rho_p/A # solid flow rate, in m/s, vector
+m_part = input.mflux_part*A # solid mass flowrate, in kg/s, vector
+Vp = m_part/input.rho_p/A # solid flow rate, in m/s, vector
 
-vt = np.zeros(len(phys.dp)) # terminal velocity by Stokes' drag, in m/s, vector
-for i in range(0, len(phys.dp)):
-    vt[i] = 2/9*(phys.rho_p-phys.rho_f)*phys.g*phys.dp**2/4/phys.mu
+lenVf = len(input.Vf)
+lendp = len(input.dp)
+lenVp = len(Vp)
+
+# Terminal velocity of the particle
+vt = np.zeros(lendp) # terminal velocity by Stokes' drag, in m/s, vector
+
+for i in range(0, lendp):
+    vt[i] = termvel(input.rho_p, input.rho_f, input.dp[i], input.mu)
 
 #---------------------Dimensionless number------------------#
-Re_pipe = np.zeros(len(Vf)) # Reynolds number of the fluid in the pipe, vector
-Re_termvel = np.zeros(len(phys.dp)) # Reynolds number of the fluid to the particle at its terminal vel
+Re_pipe = np.zeros(lenVf) # Reynolds number of the fluid in the pipe, vector
+Re_termvel = np.zeros(lendp) # Reynolds number of the fluid to the particle at its terminal vel
 
-for i in range(0, len(Vf)):
-    Re_pipe[i] = phys.rho_f*Vf[i]*phys.D/phys.mu 
+for i in range(0, lenVf):
+    Re_pipe[i] = reynolds(input.rho_f, input.Vf[i], input.D, input.mu)
 
-for i in range(0, len(phys.dp)):
-    Re_termvel[i] = phys.rho_f*vt[i]*phys.dp/phys.mu 
+for i in range(0, lendp):
+    Re_termvel[i] = reynolds(input.rho_f, vt[i], input.dp[i], input.mu)
 
 #----------Calculation of 'n' for Buoyancy Calculation------#
-n = np.zeros(len(phys.dp))
+n = np.zeros(lendp)
 
-for i in range (0, len(phys.dp)):
-    if Re_termvel[i] < 0.2:
-        n[i] = 4.65
-    elif 0.2 < Re_termvel[i] < 1:
-        n[i] = 4.35*Re_termvel[i]**(-0.03)
-    elif 1 < Re_termvel[i] < 500:
-        n[i] = 4.45*Re_termvel[i]**(-0.1)
-    else:
-        n[i] = 2.39
+for i in range (0, lendp):
+    n[i] = computeBuoyancyFactor(Re_termvel[i])
 
 #---------------Find friction factor------------------------#
 # Calculation using Colebrook-White formula
 
-def Colebrook(f):
-    return 1/np.sqrt(f) + 2*np.log10(phys.rough/3.7/phys.D + 2.51/Re_pipe/np.sqrt(f))
+f = np.zeros(lenVf)
 
-
-frict = sci.fsolve(Colebrook, inguess_frict)
-print("Pipe friction factor:", frict[0])
+for i in range (0, lenVf):
+    f[i] = colebrook(input.rough, input.D, Re_pipe[i], input.inguess_frict)
 
 #--------------------Finding phi---------------------------#
-wall_frict = -frict[0]*phys.rho_f*Vf**2
+data_results = []
 
-def eps(phi_dummy):
-    return 1-phi_dummy
+for i, Vf_i in enumerate(input.Vf):
+    f_i = f[i]
 
-def beta(phi_dummy):
-    return (phys.rho_p-phys.rho_f)*phi_dummy*phys.g / vt / (1-phi_dummy)**(n-2)
+    for j, mflux_part_j in enumerate(input.mflux_part):
+        Vp_j = Vp[j]
+        
+        for k, dp_k in enumerate(input.dp):
+            n_k = n[k]
+            vt_k = vt[k]
+            
+            result = computePhi(Vf_i,Vp_j,vt_k,n_k,f_i,input.rho_p,input.rho_f,input.D, input.inguess_phi)
+            
+            phi, dpdz, epsilon, beta = result["phi"], result["dpdz"], result["epsilon"], result["beta"]
+            
+            data_results.append([Vf_i, mflux_part_j, Vp_j, dp_k, vt_k, n_k, f_i, phi, dpdz, epsilon, beta])
 
-def dpdz(phi_dummy):
-    return (
-        -phi_dummy*phys.rho_p*phys.g - frict[0]*eps(phi_dummy)*4/phys.D*phys.rho_f*Vf**2
-    ) 
-
-def NS_fluid(phi_dummy):
-    return (
-        -eps(phi_dummy)*dpdz(phi_dummy) + 
-        eps(phi_dummy)*4/phys.D*(-frict[0]*phys.rho_f*Vf**2) - 
-        beta(phi_dummy)*(Vf/(1-phi_dummy)-Vp/phi_dummy)
+results = pd.DataFrame(
+    data_results,
+    columns = ["Vf","mflux_part","Vp","dp","vt","n","f","phi","dpdz","epsilon","beta"]
     )
 
-def NS_particle(phi_dummy): # assume no particle friction to the wall
-    return (
-        -phi_dummy*dpdz(phi_dummy) - phi_dummy*phys.rho_p*phys.g + 
-        beta(phi_dummy)*(Vf/(1-phi_dummy)-Vp/phi_dummy)
-    )
+#-------------------Store the result-----------------------#
+def save_results(results, base_filename):
+    filename = base_filename
+    name, ext = os.path.splitext(base_filename)
+    counter = 1
 
-def NS(phi_dummy):
-    return NS_fluid(phi_dummy) - NS_particle(phi_dummy)
+    while os.path.exists(filename):
+        filename = f"{name}_{counter}{ext}"
+        counter += 1
+        
+    results.to_csv(filename, index=False)
 
-phi = sci.fsolve(NS, inguess_phi)
-print("Fluid volume fraction:", phi[0])
-
-print("Pressure gradient:", dpdz(phi))
+save_results(results, input.output_filename)
 
 
 
