@@ -79,24 +79,25 @@ for i, Vf_i in enumerate(input.Vf):
             vt_k = vt[k]
             
             result = computePhi(Vf_i,Vp_j,vt_k,n_k,f_i,input.rho_p,input.rho_f,input.D, 
-                                input.inguess_phi, input.partFrict, input.mu_p, input.partFrictConst)
+                                input.inguess_phi, input.bodyForceCoeff, input.fluidFrictCoeff,
+                                input.partFrict, input.mu_p, input.partFrictCoeff)
             
        
-            phi, dpdz, epsilon, beta, fluidWallStress = result["phi"], result["dpdz"], result["epsilon"], result["beta"], result["fluidWallStress"]
+            phi, epsilon, beta = result["phi"], result["epsilon"], result["beta"]
 
-            dpdz_inv = -dpdz
-            fluidWallStress_inv = -fluidWallStress
+            dpdz, lossPartBodyForce, lossFluidWallFrict = -result["dpdz"], -result["lossPartBodyForce"], -result["lossFluidWallFrict"]
             
-            particleWallStress = result.get("particleWallStress", None)
-            particleWallStress_inv = -particleWallStress if particleWallStress is not None else None
+            lossPartWallFrict = result.get("lossPartWallFrict", None)
+            lossPartWallFrict = -lossPartWallFrict if lossPartWallFrict is not None else None
+
+            lossTotalFrict = lossFluidWallFrict + lossPartWallFrict if lossPartWallFrict is not None else None
             
-            data_results.append([Vf_i, mflux_part_j, Vp_j, dp_k, vt_k, n_k, f_i, phi, dpdz, epsilon, beta, fluidWallStress, particleWallStress,
-                                 dpdz_inv, fluidWallStress_inv, particleWallStress_inv])
+            data_results.append([Vf_i, mflux_part_j, Vp_j, dp_k, vt_k, n_k, f_i, phi, epsilon, beta, 
+                                 dpdz, lossPartBodyForce, lossFluidWallFrict, lossPartWallFrict, lossTotalFrict])
 
 results = pd.DataFrame(
     data_results,
-    columns = ["Vf","mflux_part","Vp","dp","vt","n","f","phi","dpdz","epsilon","beta", "fluidWallStress", "particleWallStress", "dpdz_inv",
-               "fluidWallStress_inv", "particleWallStress_inv"]
+    columns = ["Vf","mflux_part","Vp","dp","vt","n","f","phi","epsilon","beta","dpdz","lossPartBodyForce","lossFluidWallFrict","lossPartWallFrict", "lossTotalFrict"]
     )
 
 #-------------------Store the result-----------------------#
