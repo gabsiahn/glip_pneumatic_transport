@@ -7,6 +7,8 @@
 
 # *************** Calculation for Reynolds number ************* #
 
+import numpy as np
+
 def reynolds(rho, velocity, D, mu):
     Re = rho*velocity*D/mu
 

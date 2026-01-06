@@ -14,8 +14,10 @@ import scipy.optimize as sci
 import scipy.constants as const
 
 # Description of the function
-def computePhi(Vf,Vp,vt,n,frictCoeff,rho_p, rho_f, D, inguess_phi, bodyForceCoeff, fluidFrictCoeff, 
+def computePhi(Vf,Vp,vt,n,frictCoeff,rho_p, rho_f, D, inguess_phi, bodyForceCoeff=1, fluidFrictCoeff=1, 
                partFrict=0, mu_p=None, partFrictCoeff=None):
+    
+    Vp = max(Vp, 1e-6)
     
     if partFrict == 1:
         if mu_p is None or partFrictCoeff is None:
@@ -29,7 +31,7 @@ def computePhi(Vf,Vp,vt,n,frictCoeff,rho_p, rho_f, D, inguess_phi, bodyForceCoef
 
     def lossFluidWallFrict(phi_dummy):
 
-        fluidWallStress = -frictCoeff*rho_f*Vf**2*fluidFrictCoeff
+        fluidWallStress = -frictCoeff*rho_f*Vf**2*fluidFrictCoeff/8 #test
 
         return epsilon(phi_dummy)*4/D*fluidWallStress
     
