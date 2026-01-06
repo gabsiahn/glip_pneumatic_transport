@@ -38,6 +38,7 @@ Vf = np.linspace(3.5,13,num=100) # fluid velocity, in m/s.
 
 # Solid
 # The input is an array
+# mflux_part = np.array([0])
 mflux_part = np.array([5.1, 10.5, 19.6, 31.8, 49.1, 59, 80.7, 141]) # solid mass flux, in kg/m2/s
 
 #----------------------Intial Guesses-----------------------#
@@ -45,7 +46,7 @@ inguess_frict = 0.01 # initial guess of friction factor
 inguess_phi = 0.3 # initial guess of phi
 
 #-------Switch to include particle friction at wall--------#
-partFrict = 0 #1: on, 0: off, default is 0
+partFrict = 1 #1: on, 0: off, default is 0
 
 # Compulsory additional input if partFrict = 1
 partFrictCoeff = 0.01 # constant to be fitted on the experiments
@@ -53,8 +54,9 @@ mu_p = 0.5 # Coulomb dynamic coefficient of friction
 
 #-------------Fitting coefficient, optional----------------#
 bodyForceCoeff = 1 # If not used, just keep it as 1, default is 1!!
-fluidFrictCoeff = 1 # If not used, just keep it as 1, default is 1!! 
+fluidFrictCoeff = 1 # C1. If not used, just keep it as 1, default is 1!!
 
 #-------------------Saving file settings--------------------#
-output_filename = "pneumatic_transport_results.csv"
-# output_filename = "pneumatic_transport_results_withPartFrict0.01.csv"
+# output_filename = "pneumatic_transport_results.csv"
+# output_filename = "pneumatic_transport_results_withPartFrict0.002.csv"
+output_filename = "pneumatic_transport_results_C1_0.1_partFrict_0.01.csv"

@@ -14,7 +14,7 @@ import os
 # Module functions
 from functions.reynolds import reynolds
 from functions.computeBuoyancyFactor import computeBuoyancyFactor
-from functions.termvel import termvel
+from functions.termvel import termvel, termVel
 from functions.colebrook import colebrook
 from functions.computePhi import computePhi
 
@@ -33,29 +33,39 @@ Vp = m_part/input.rho_p/A # solid flow rate, in m/s, vector
 
 lenVf = len(input.Vf)
 lendp = len(input.dp)
-lenVp = len(Vp)
+# lenVp = len(Vp)
 
-# Terminal velocity of the particle
-vt = np.zeros(lendp) # terminal velocity by Stokes' drag, in m/s, vector
+# Calculate Reynolds number of particle
+Re_particle = reynolds(input.rho_f, Vp, input.dp, input.mu)
 
-for i in range(0, lendp):
-    vt[i] = termvel(input.rho_p, input.rho_f, input.dp[i], input.mu)
+# Terminal velocity of the particle, flow regimes, Re at terminal velocity and buoyancy factor ('n')
+vt = np.zeros((lenVf, lendp))
+Re_termvel = np.zeros((lenVf, lendp))
+regime = np.empty((lenVf, lendp), dtype=object)
+
+n = np.zeros(lendp)
+
+for i in range(lenVf):
+    for j in range(lendp):
+        solnTermVel = termVel(input.Vf[i], input.rho_p, input.rho_f, input.dp[j], input.mu)
+
+        vt[i, j] = solnTermVel[0]
+        Re_termvel[i, j] = solnTermVel[1]
+        regime[i, j] = solnTermVel[2]
+
+        n[j] = computeBuoyancyFactor(Re_termvel[i,j])
 
 #---------------------Dimensionless number------------------#
 Re_pipe = np.zeros(lenVf) # Reynolds number of the fluid in the pipe, vector
-Re_termvel = np.zeros(lendp) # Reynolds number of the fluid to the particle at its terminal vel
 
 for i in range(0, lenVf):
     Re_pipe[i] = reynolds(input.rho_f, input.Vf[i], input.D, input.mu)
 
-for i in range(0, lendp):
-    Re_termvel[i] = reynolds(input.rho_f, vt[i], input.dp[i], input.mu)
-
 #----------Calculation of 'n' for Buoyancy Calculation------#
-n = np.zeros(lendp)
+# n = np.zeros(lendp)
 
-for i in range (0, lendp):
-    n[i] = computeBuoyancyFactor(Re_termvel[i])
+# for i in range (0, lendp):
+#     n[i] = computeBuoyancyFactor(Re_termvel[i])
 
 #---------------Find friction factor------------------------#
 # Calculation using Colebrook-White formula
@@ -76,9 +86,12 @@ for i, Vf_i in enumerate(input.Vf):
         
         for k, dp_k in enumerate(input.dp):
             n_k = n[k]
-            vt_k = vt[k]
+
+            vt_ik = vt[i,k]
+            Re_vt_ik = Re_termvel[i,k]
+            regime_ik = regime[i,k]
             
-            result = computePhi(Vf_i,Vp_j,vt_k,n_k,f_i,input.rho_p,input.rho_f,input.D, 
+            result = computePhi(Vf_i,Vp_j,vt_ik,n_k,f_i,input.rho_p,input.rho_f,input.D, 
                                 input.inguess_phi, input.bodyForceCoeff, input.fluidFrictCoeff,
                                 input.partFrict, input.mu_p, input.partFrictCoeff)
             
@@ -91,13 +104,18 @@ for i, Vf_i in enumerate(input.Vf):
             lossPartWallFrict = -lossPartWallFrict if lossPartWallFrict is not None else None
 
             lossTotalFrict = lossFluidWallFrict + lossPartWallFrict if lossPartWallFrict is not None else None
+
+            Vp_phi = Vp_j/phi
+
+            Vsl = Vf_i-Vp_phi
             
-            data_results.append([Vf_i, mflux_part_j, Vp_j, dp_k, vt_k, n_k, f_i, phi, epsilon, beta, 
+            data_results.append([Vf_i, Re_pipe[i], mflux_part_j, Vp_phi, Vsl,dp_k, vt_ik, Re_vt_ik, regime_ik, n_k, f_i, phi, epsilon, beta, 
                                  dpdz, lossPartBodyForce, lossFluidWallFrict, lossPartWallFrict, lossTotalFrict])
 
 results = pd.DataFrame(
     data_results,
-    columns = ["Vf","mflux_part","Vp","dp","vt","n","f","phi","epsilon","beta","dpdz","lossPartBodyForce","lossFluidWallFrict","lossPartWallFrict", "lossTotalFrict"]
+    columns = ["Vf","Re_pipe","mflux_part","Vp","Vsl","dp","vt","Re_vt","flowRegime","n","f","phi","epsilon",
+               "beta","dpdz","lossPartBodyForce","lossFluidWallFrict","lossPartWallFrict", "lossTotalFrict"]
     )
 
 #-------------------Store the result-----------------------#
