@@ -43,7 +43,7 @@ def computePhi(Vf,Vp,vt,n,frictCoeff,rho_p, rho_f, D, inguess_phi, bodyForceCoef
     
     def beta(phi_dummy):
         return (rho_p-rho_f)*phi_dummy*const.g / vt / (1-phi_dummy)**(n-2)
-    
+
     def dpdz(phi_dummy):
         dpdz_total = lossPartBodyForce(phi_dummy) + lossFluidWallFrict(phi_dummy)
 
